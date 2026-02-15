@@ -1,50 +1,86 @@
 import time
 import random
+import asyncio
+import os
 import undetected_chromedriver as uc
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from dotenv import load_dotenv
 
-url = "https://www.dns-shop.ru/product/66c8c7c94231ed20/operativnaa-pamat-adata-xpg-lancer-blade-ax5u5600c4616g-dtlabbk-32-gb/"
+load_dotenv()
+TOKEN = os.getenv("TOKEN")
 
-options = uc.ChromeOptions()
-options.add_argument("--start-maximized")
-options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
 
-driver = uc.Chrome(
-    options=options,
-    use_subprocess=True
-)
+def get_price(url):
+    options = uc.ChromeOptions()
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-blink-features=AutomationControlled")
 
-try:
-    driver.get("https://www.dns-shop.ru/")
+    driver = uc.Chrome(options=options, use_subprocess=True)
 
-    # Ждём главную
-    time.sleep(random.uniform(3, 5))
+    try:
+        driver.get("https://www.dns-shop.ru/")
+        time.sleep(random.uniform(3, 5))
 
-    # Переходим на товар через главную (важно!)
-    driver.get(url)
+        driver.get(url)
+        time.sleep(random.uniform(5, 8))
 
-    time.sleep(random.uniform(5, 8))
+        driver.execute_script(
+            "window.scrollTo(0, document.body.scrollHeight/2);"
+        )
+        time.sleep(random.uniform(2, 4))
 
-    # Немного скроллим как человек
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-    time.sleep(random.uniform(2, 4))
+        wait = WebDriverWait(driver, 20)
 
-    wait = WebDriverWait(driver, 20)
+        price_element = wait.until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, ".product-buy__price")
+            )
+        )
 
-    price = wait.until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, ".product-buy__price"))
-    )
+        return price_element.text
 
-    print("Цена:", price.text)
+    except Exception as e:
+        return f"Ошибка: {e}"
 
-except Exception as e:
-    print("Ошибка:", e)
+    finally:
+        try:
+            driver.quit()
+        except:
+            pass
 
-finally:
-    time.sleep(5)
-    driver.quit()
+
+async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not context.args:
+        await update.message.reply_text(
+            "Пришли ссылку после команды:\n/add ссылка"
+        )
+        return
+
+    url = context.args[0]
+
+    await update.message.reply_text("🔍 Ищу цену, подожди...")
+
+    # Selenium блокирующий → запускаем в отдельном потоке
+    loop = asyncio.get_event_loop()
+    price = await loop.run_in_executor(None, get_price, url)
+
+    await update.message.reply_text(f"💰 Цена:\n{price}")
+
+
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("add", add))
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
