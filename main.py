@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import requests
-from bs4 import BeautifulSoup
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message
 from aiogram.filters import Command
@@ -10,6 +8,13 @@ from dotenv import load_dotenv
 import os
 import json
 import re
+import time
+
+# Selenium
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 
 # ======================
 # НАСТРОЙКИ
@@ -20,9 +25,7 @@ TOKEN = os.getenv("TOKEN")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
 scheduler = AsyncIOScheduler()
-
 DATA_FILE = "products.json"
 
 # ======================
@@ -31,36 +34,50 @@ DATA_FILE = "products.json"
 
 def load_data():
     try:
-        with open(DATA_FILE, "r") as f:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return {}
 
 def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 # ======================
-# ПАРСИНГ ЦЕНЫ
+# ФУНКЦИЯ ПОЛУЧЕНИЯ ЦЕНЫ ЧЕРЕЗ SELENIUM
 # ======================
 
 def get_price(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    options = Options()
+    options.add_argument("--headless")  # без окна
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--log-level=3")
 
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    # Укажи путь к chromedriver, если он не в PATH
+    service = Service(executable_path="chromedriver-win64/chromedriver-win64/chromedriver.exe")
+    driver = webdriver.Chrome(service=service, options=options)
 
-    # Ищем цену (может потребоваться корректировка)
-    price_tag = soup.find("span", {"class": "product-buy__price"})
-    if not price_tag:
+    try:
+        driver.get(url)
+        #time.sleep(3) # Ждём 3 секунды загрузки Json
+        # Ждём до 10 секунд, пока элемент с ценой появится
+        wait = WebDriverWait(driver, 10)
+
+        # Находим цену по актуальному классу
+        price_elem = wait.until(EC.presence_of_element_located(
+            (By.CLASS_NAME, "product-card-price__current")
+        ))
+        #price_elem = driver.find_element(By.CLASS_NAME, "product-card-price__current")
+        price_text = price_elem.text.strip()
+        price_number = re.sub(r"[^\d]", "", price_text)
+        return int(price_number)
+    except Exception as e:
+        print("Ошибка Selenium:", e)
         return None
-
-    price_text = price_tag.text.strip()
-    price_number = re.sub(r"[^\d]", "", price_text)
-
-    return int(price_number)
+    finally:
+        driver.quit()
 
 # ======================
 # ДОБАВЛЕНИЕ ТОВАРА
@@ -77,15 +94,13 @@ async def add_product(message: Message):
     url = args[1]
 
     price = get_price(url)
-
-    #print(get_price("https://www.dns-shop.ru/product/66c8c7c94231ed20/operativnaa-pamat-adata-xpg-lancer-blade-ax5u5600c4616g-dtlabbk-32-gb/"))
+    print("Полученная цена:", price)  # для отладки
 
     if price is None:
         await message.answer("Не удалось получить цену. Проверь ссылку.")
         return
 
     data = load_data()
-
     user_id = str(message.from_user.id)
 
     if user_id not in data:
@@ -99,7 +114,6 @@ async def add_product(message: Message):
     })
 
     save_data(data)
-
     await message.answer(f"Товар добавлен! Текущая цена: {price} ₽")
 
 # ======================
@@ -115,7 +129,6 @@ async def check_prices():
             old_price = product["last_price"]
 
             new_price = get_price(url)
-
             if new_price is None:
                 continue
 
@@ -155,10 +168,8 @@ async def start(message: Message):
     )
 
 async def main():
-    
     scheduler.add_job(check_prices, "interval", hours=24)
     scheduler.start()
-
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
