@@ -1,81 +1,50 @@
-import asyncio
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from playwright.async_api import async_playwright
-from playwright_stealth import Stealth
+import time
+import random
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
+url = "https://www.dns-shop.ru/product/66c8c7c94231ed20/operativnaa-pamat-adata-xpg-lancer-blade-ax5u5600c4616g-dtlabbk-32-gb/"
 
-import os
-import asyncio
-import httpx
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from dotenv import load_dotenv
-import re
+options = uc.ChromeOptions()
+options.add_argument("--start-maximized")
+options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
 
-load_dotenv()
+driver = uc.Chrome(
+    options=options,
+    use_subprocess=True
+)
 
-TOKEN = os.getenv("TOKEN")
+try:
+    driver.get("https://www.dns-shop.ru/")
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+    # Ждём главную
+    time.sleep(random.uniform(3, 5))
 
+    # Переходим на товар через главную (важно!)
+    driver.get(url)
 
-async def get_price(url: str) -> str:
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Accept": "text/html,application/xhtml+xml",
-            "Referer": "https://www.dns-shop.ru/",
-        }
+    time.sleep(random.uniform(5, 8))
 
-        async with httpx.AsyncClient(headers=headers, timeout=20) as client:
-            response = await client.get(url)
+    # Немного скроллим как человек
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+    time.sleep(random.uniform(2, 4))
 
-        if response.status_code != 200:
-            return f"Ошибка HTTP: {response.status_code}"
+    wait = WebDriverWait(driver, 20)
 
-        html = response.text
+    price = wait.until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, ".product-buy__price"))
+    )
 
-        # Ищем цену через regex
-        match = re.search(r'"price":\s?(\d+)', html)
+    print("Цена:", price.text)
 
-        if match:
-            price = match.group(1)
-            return f"{price} ₽"
-        else:
-            return "Цена не найдена"
+except Exception as e:
+    print("Ошибка:", e)
 
-    except Exception as e:
-        return f"Ошибка: {e}"
-
-
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    await message.answer("Привет 👋\n/add ССЫЛКА")
-
-
-@dp.message(Command("add"))
-async def add_product(message: types.Message):
-    parts = message.text.split()
-
-    if len(parts) < 2:
-        await message.answer("❌ Вставь ссылку после /add")
-        return
-
-    url = parts[1]
-
-    await message.answer("🔎 Проверяю цену...")
-
-    price = await get_price(url)
-
-    await message.answer(f"💰 Цена:\n{price}")
-
-
-async def main():
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+finally:
+    time.sleep(5)
+    driver.quit()
