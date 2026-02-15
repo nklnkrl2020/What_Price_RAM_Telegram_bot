@@ -7,7 +7,7 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 # ======================
 # ЗАГРУЗКА ТОКЕНА
@@ -38,22 +38,22 @@ def save_data(data):
         json.dump(data, f, indent=4)
 
 # ======================
-# PLAYWRIGHT ДЛЯ ПАРСИНГА
+# АСИНХРОННЫЙ PLAYWRIGHT
 # ======================
-def get_price(url):
+async def get_price(url):
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle")
-            page.wait_for_timeout(2000)  # подождать JS
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto(url, wait_until="networkidle")
+            await page.wait_for_timeout(1000)
 
             # CSS селектор цены на DNS
             price_element = page.locator("span.product-buy__price").first
-            price_text = price_element.inner_text().strip()
+            price_text = await price_element.inner_text()
             price_number = int(''.join(filter(str.isdigit, price_text)))
 
-            browser.close()
+            await browser.close()
             return price_number
     except Exception as e:
         print("Ошибка при парсинге:", e)
@@ -81,7 +81,7 @@ async def add_product(message: Message):
         return
 
     url = args[1]
-    price = get_price(url)
+    price = await get_price(url)
     if price is None:
         await message.answer("Не удалось получить цену. Проверь ссылку.")
         return
@@ -109,7 +109,7 @@ async def check_prices():
         for product in products:
             url = product["url"]
             old_price = product["last_price"]
-            new_price = get_price(url)
+            new_price = await get_price(url)
             if new_price is None:
                 continue
 
