@@ -78,6 +78,8 @@ async def add_product(message: Message):
 
     price = get_price(url)
 
+    #print(get_price("https://www.dns-shop.ru/product/66c8c7c94231ed20/operativnaa-pamat-adata-xpg-lancer-blade-ax5u5600c4616g-dtlabbk-32-gb/"))
+
     if price is None:
         await message.answer("Не удалось получить цену. Проверь ссылку.")
         return
@@ -153,6 +155,7 @@ async def start(message: Message):
     )
 
 async def main():
+    
     scheduler.add_job(check_prices, "interval", hours=24)
     scheduler.start()
 
