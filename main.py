@@ -11,6 +11,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import MessageHandler, filters
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,6 +34,19 @@ def load_data():
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+def main_menu_keyboard():
+    keyboard = [
+        [KeyboardButton("➕ Добавить товар")],
+        [KeyboardButton("📦 Мои товары")],
+        [KeyboardButton("❌ Удалить товар")]
+    ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True
+    )
+
 
 def get_price(url):
     options = uc.ChromeOptions()
@@ -69,6 +85,12 @@ def get_price(url):
             driver.quit()
         except:
             pass
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Добро пожаловать 👋\nВыбери действие:",
+        reply_markup=main_menu_keyboard()
+    )
 
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -212,10 +234,36 @@ async def remove_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"❌ Товар удалён:\n{removed_product['url']}"
     )
 
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if context.user_data.get("waiting_for_url"):
+        context.user_data["waiting_for_url"] = False
+        context.args = [text]
+        await add(update, context)
+        return
+
+    if text == "➕ Добавить товар":
+        await update.message.reply_text(
+            "Отправь ссылку на товар:"
+        )
+        context.user_data["waiting_for_url"] = True
+
+    elif text == "📦 Мои товары":
+        await list_products(update, context)
+
+    elif text == "❌ Удалить товар":
+        await update.message.reply_text(
+            "Напиши номер товара для удаления:\n/remove 1"
+        )
+
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
+
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add))
     app.add_handler(CommandHandler("list", list_products))
     app.add_handler(CommandHandler("remove", remove_product))
