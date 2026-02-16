@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
@@ -15,6 +16,21 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
+
+import json
+
+DATA_FILE = "products.json"
+
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {}
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def get_price(url):
     options = uc.ChromeOptions()
@@ -64,14 +80,83 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     url = context.args[0]
+    user_id = str(update.effective_user.id)
 
     await update.message.reply_text("🔍 Ищу цену, подожди...")
 
-    # Selenium блокирующий → запускаем в отдельном потоке
     loop = asyncio.get_event_loop()
-    price = await loop.run_in_executor(None, get_price, url)
+    price_text = await loop.run_in_executor(None, get_price, url)
 
-    await update.message.reply_text(f"💰 Цена:\n{price}")
+    if "Ошибка" in price_text:
+        await update.message.reply_text(price_text)
+        return
+
+    # оставляем только цифры
+    price = int("".join(filter(str.isdigit, price_text)))
+
+    data = load_data()
+
+    if user_id not in data:
+        data[user_id] = []
+
+    data[user_id].append({
+        "url": url,
+        "last_price": price,
+        "min_price": price,
+        "max_price": price
+    })
+
+    save_data(data)
+
+    await update.message.reply_text(
+        f"✅ Товар добавлен\nТекущая цена: {price} ₽"
+    )
+
+async def check_prices(app):
+
+    data = load_data()
+
+    for user_id, products in data.items():
+        for product in products:
+
+            url = product["url"]
+            old_price = product["last_price"]
+
+            loop = asyncio.get_event_loop()
+            price_text = await loop.run_in_executor(None, get_price, url)
+
+            if "Ошибка" in price_text:
+                continue
+
+            new_price = int("".join(filter(str.isdigit, price_text)))
+
+            diff = new_price - old_price
+
+            if diff == 0:
+                message = f"Цена не изменилась: {new_price} ₽"
+            elif diff > 0:
+                message = (
+                    f"📈 Цена выросла на {diff} ₽\n"
+                    f"Сейчас: {new_price} ₽"
+                )
+            else:
+                message = (
+                    f"📉 Цена снизилась на {abs(diff)} ₽\n"
+                    f"Сейчас: {new_price} ₽"
+                )
+
+            product["min_price"] = min(product["min_price"], new_price)
+            product["max_price"] = max(product["max_price"], new_price)
+            product["last_price"] = new_price
+
+            message += (
+                f"\n\nМинимальная цена: {product['min_price']} ₽"
+                f"\nМаксимальная цена: {product['max_price']} ₽"
+            )
+
+            await app.bot.send_message(chat_id=user_id, text=message)
+
+    save_data(data)
 
 
 def main():
@@ -79,7 +164,16 @@ def main():
 
     app.add_handler(CommandHandler("add", add))
 
+    # запуск проверки раз в 24 часа
+    app.job_queue.run_repeating(
+        check_prices,
+        interval=86400,  # 24 часа
+        #first=10         # первый запуск через 10 секунд
+    )
+
     app.run_polling()
+
+
 
 
 if __name__ == "__main__":
