@@ -158,11 +158,67 @@ async def check_prices(app):
 
     save_data(data)
 
+async def list_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = str(update.effective_user.id)
+    data = load_data()
+
+    if user_id not in data or not data[user_id]:
+        await update.message.reply_text("У тебя нет отслеживаемых товаров.")
+        return
+
+    message = "📦 Твои товары:\n\n"
+
+    for i, product in enumerate(data[user_id], start=1):
+        message += (
+            f"{i}. {product['url']}\n"
+            f"   Текущая цена: {product['last_price']} ₽\n"
+            f"   Мин: {product['min_price']} ₽ | "
+            f"Макс: {product['max_price']} ₽\n\n"
+        )
+
+    await update.message.reply_text(message)
+
+async def remove_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = str(update.effective_user.id)
+    data = load_data()
+
+    if user_id not in data or not data[user_id]:
+        await update.message.reply_text("У тебя нет товаров для удаления.")
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "Укажи номер товара:\n/remove 1"
+        )
+        return
+
+    try:
+        index = int(context.args[0]) - 1
+    except ValueError:
+        await update.message.reply_text("Нужно указать число.")
+        return
+
+    if index < 0 or index >= len(data[user_id]):
+        await update.message.reply_text("Товара с таким номером нет.")
+        return
+
+    removed_product = data[user_id].pop(index)
+
+    save_data(data)
+
+    await update.message.reply_text(
+        f"❌ Товар удалён:\n{removed_product['url']}"
+    )
+
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("add", add))
+    app.add_handler(CommandHandler("list", list_products))
+    app.add_handler(CommandHandler("remove", remove_product))
 
     # запуск проверки раз в 24 часа
     app.job_queue.run_repeating(
