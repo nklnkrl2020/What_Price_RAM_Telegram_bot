@@ -19,16 +19,32 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
+#ADMIN_ID = os.getenv("ADMIN_ID")  # ← сюда свой telegram id
+ADMIN_ID=705840823
 
 import json
 
 DATA_FILE = "products.json"
 
+def is_admin(user_id):
+    return user_id == ADMIN_ID
+
+
 def load_data():
     if not os.path.exists(DATA_FILE):
-        return {}
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return {
+            "subscribers": [],
+            "products": []
+        }
+
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {
+            "subscribers": [],
+            "products": []
+        }
 
 
 def save_data(data):
@@ -87,24 +103,37 @@ def get_price(url):
             pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_user.id
+    data = load_data()
+
+    if user_id not in data["subscribers"]:
+        data["subscribers"].append(user_id)
+        save_data(data)
+
     await update.message.reply_text(
-        "Добро пожаловать 👋\nВыбери действие:",
-        reply_markup=main_menu_keyboard()
+        "✅ Ты подписан на уведомления о ценах!"
     )
+
 
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У тебя нет доступа.")
+        return
+
     if not context.args:
         await update.message.reply_text(
-            "Пришли ссылку после команды:\n/add ссылка"
+            "Использование: /add ссылка"
         )
         return
 
     url = context.args[0]
-    user_id = str(update.effective_user.id)
 
-    await update.message.reply_text("🔍 Ищу цену, подожди...")
+    await update.message.reply_text("🔍 Проверяю цену...")
 
     loop = asyncio.get_event_loop()
     price_text = await loop.run_in_executor(None, get_price, url)
@@ -113,15 +142,11 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(price_text)
         return
 
-    # оставляем только цифры
     price = int("".join(filter(str.isdigit, price_text)))
 
     data = load_data()
 
-    if user_id not in data:
-        data[user_id] = []
-
-    data[user_id].append({
+    data["products"].append({
         "url": url,
         "last_price": price,
         "min_price": price,
@@ -131,54 +156,57 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
 
     await update.message.reply_text(
-        f"✅ Товар добавлен\nТекущая цена: {price} ₽"
+        f"✅ Товар добавлен\nЦена: {price} ₽"
     )
 
-async def check_prices(app):
+
+async def check_prices(context: ContextTypes.DEFAULT_TYPE):
 
     data = load_data()
 
-    for user_id, products in data.items():
-        for product in products:
+    for product in data["products"]:
 
-            url = product["url"]
-            old_price = product["last_price"]
+        url = product["url"]
+        old_price = product["last_price"]
 
-            loop = asyncio.get_event_loop()
-            price_text = await loop.run_in_executor(None, get_price, url)
+        loop = asyncio.get_event_loop()
+        price_text = await loop.run_in_executor(None, get_price, url)
 
-            if "Ошибка" in price_text:
-                continue
+        if "Ошибка" in price_text:
+            continue
 
-            new_price = int("".join(filter(str.isdigit, price_text)))
+        new_price = int("".join(filter(str.isdigit, price_text)))
+        diff = new_price - old_price
 
-            diff = new_price - old_price
+        if diff == 0:
+            message = f"Цена не изменилась: {new_price} ₽"
+        elif diff > 0:
+            message = f"📈 Цена выросла на {diff} ₽\nСейчас: {new_price} ₽"
+        else:
+            message = f"📉 Цена снизилась на {abs(diff)} ₽\nСейчас: {new_price} ₽"
 
-            if diff == 0:
-                message = f"Цена не изменилась: {new_price} ₽"
-            elif diff > 0:
-                message = (
-                    f"📈 Цена выросла на {diff} ₽\n"
-                    f"Сейчас: {new_price} ₽"
+        product["min_price"] = min(product["min_price"], new_price)
+        product["max_price"] = max(product["max_price"], new_price)
+        product["last_price"] = new_price
+
+        message += (
+            f"\n\nМинимальная: {product['min_price']} ₽"
+            f"\nМаксимальная: {product['max_price']} ₽"
+            f"\n\n{url}"
+        )
+
+        # 🔥 отправляем всем подписчикам
+        for subscriber in data["subscribers"]:
+            try:
+                await context.bot.send_message(
+                    chat_id=subscriber,
+                    text=message
                 )
-            else:
-                message = (
-                    f"📉 Цена снизилась на {abs(diff)} ₽\n"
-                    f"Сейчас: {new_price} ₽"
-                )
-
-            product["min_price"] = min(product["min_price"], new_price)
-            product["max_price"] = max(product["max_price"], new_price)
-            product["last_price"] = new_price
-
-            message += (
-                f"\n\nМинимальная цена: {product['min_price']} ₽"
-                f"\nМаксимальная цена: {product['max_price']} ₽"
-            )
-
-            await app.bot.send_message(chat_id=user_id, text=message)
+            except:
+                pass
 
     save_data(data)
+
 
 async def list_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
