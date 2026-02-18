@@ -18,9 +18,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
+#ADMIN_ID =   # ← сюда свой telegram id
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-#ADMIN_ID = os.getenv("ADMIN_ID")  # ← сюда свой telegram id
-ADMIN_ID=705840823
 
 import json
 
@@ -132,6 +132,15 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     url = context.args[0]
+    data = load_data()
+
+    for product in data["products"]:
+        if product["url"] == url:
+            await update.message.reply_text(
+                "⚠ Этот товар уже отслеживается."
+            )
+            return
+
 
     await update.message.reply_text("🔍 Проверяю цену...")
 
@@ -144,7 +153,6 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     price = int("".join(filter(str.isdigit, price_text)))
 
-    data = load_data()
 
     data["products"].append({
         "url": url,
@@ -210,16 +218,21 @@ async def check_prices(context: ContextTypes.DEFAULT_TYPE):
 
 async def list_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    user_id = str(update.effective_user.id)
-    data = load_data()
+    user_id = update.effective_user.id
 
-    if user_id not in data or not data[user_id]:
-        await update.message.reply_text("У тебя нет отслеживаемых товаров.")
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У тебя нет доступа.")
         return
 
-    message = "📦 Твои товары:\n\n"
+    data = load_data()
 
-    for i, product in enumerate(data[user_id], start=1):
+    if not data["products"]:
+        await update.message.reply_text("Нет добавленных товаров.")
+        return
+
+    message = "📦 Отслеживаемые товары:\n\n"
+
+    for i, product in enumerate(data["products"], start=1):
         message += (
             f"{i}. {product['url']}\n"
             f"   Текущая цена: {product['last_price']} ₽\n"
@@ -229,13 +242,19 @@ async def list_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(message)
 
+
 async def remove_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    user_id = str(update.effective_user.id)
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У тебя нет доступа.")
+        return
+
     data = load_data()
 
-    if user_id not in data or not data[user_id]:
-        await update.message.reply_text("У тебя нет товаров для удаления.")
+    if not data["products"]:
+        await update.message.reply_text("Нет товаров для удаления.")
         return
 
     if not context.args:
@@ -250,17 +269,18 @@ async def remove_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Нужно указать число.")
         return
 
-    if index < 0 or index >= len(data[user_id]):
+    if index < 0 or index >= len(data["products"]):
         await update.message.reply_text("Товара с таким номером нет.")
         return
 
-    removed_product = data[user_id].pop(index)
+    removed_product = data["products"].pop(index)
 
     save_data(data)
 
     await update.message.reply_text(
         f"❌ Товар удалён:\n{removed_product['url']}"
     )
+
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -285,6 +305,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Напиши номер товара для удаления:\n/remove 1"
         )
 
+async def error_handler(update, context):
+    print("Ошибка:", context.error)
+
+
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
@@ -295,7 +319,7 @@ def main():
     app.add_handler(CommandHandler("add", add))
     app.add_handler(CommandHandler("list", list_products))
     app.add_handler(CommandHandler("remove", remove_product))
-
+    app.add_error_handler(error_handler)
     # запуск проверки раз в 24 часа
     app.job_queue.run_repeating(
         check_prices,
