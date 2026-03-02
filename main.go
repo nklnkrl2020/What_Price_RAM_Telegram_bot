@@ -41,19 +41,19 @@ func main() {
 	// =========================
 	// УСТАНОВКА НОВОГО МЕНЮ (квадратики справа)
 	// =========================
-	commands := []tgbotapi.BotCommand{
-		{Command: "start", Description: "Запуск бота"},
-		{Command: "products", Description: "Список товаров"},
-		{Command: "add", Description: "Добавить товар (админ)"},
-		{Command: "remove", Description: "Удалить товар (админ)"},
-		{Command: "unsubscribe", Description: "Отписаться"},
-	}
+	// commands := []tgbotapi.BotCommand{
+	// 	{Command: "start", Description: "Запуск бота"},
+	// 	{Command: "products", Description: "Список товаров"},
+	// 	{Command: "add", Description: "Добавить товар (админ)"},
+	// 	{Command: "remove", Description: "Удалить товар (админ)"},
+	// 	{Command: "unsubscribe", Description: "Отписаться"},
+	// }
 
-	cfgCmd := tgbotapi.NewSetMyCommands(commands...)
-	_, err = tgbot.Request(cfgCmd)
-	if err != nil {
-		log.Fatal("Ошибка установки меню:", err)
-	}
+	// cfgCmd := tgbotapi.NewSetMyCommands(commands...)
+	// _, err = tgbot.Request(cfgCmd)
+	// if err != nil {
+	// 	log.Fatal("Ошибка установки меню:", err)
+	// }
 
 	// =========================
 	// Создание handler

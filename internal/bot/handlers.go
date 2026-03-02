@@ -104,6 +104,13 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 	case "❌ Отписаться":
 		h.unsubscribe(msg.Chat.ID, userID)
 
+	case "❌ Удалить":
+		if userID == h.AdminID {
+			h.removeProduct(msg.Chat.ID, text)
+		} else {
+			h.reply(msg.Chat.ID, "❌ Нет доступа")
+		}
+
 	case "➕ Добавить":
 		if userID != h.AdminID {
 			h.reply(msg.Chat.ID, "❌ Нет доступа")
@@ -176,13 +183,12 @@ func (h *Handler) unsubscribe(chatID int64, userID int64) {
 // =========================
 func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 
-	h.reply(chatID, "🔍 Проверяю цену...")
-
-	price, err := parser.GetPrice(url)
-	if err != nil {
-		h.reply(chatID, "Ошибка получения цены")
+	if ok := strings.HasPrefix(url,"https"); !ok {
+		h.reply(chatID, "Это не ссылка на товар")
 		return
 	}
+
+	h.reply(chatID, "🔍 Проверяю цену...")
 
 	data, _ := h.Store.Load()
 
@@ -192,6 +198,13 @@ func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 			return
 		}
 	}
+
+	price, err := parser.GetPrice(url)
+	if err != nil {
+		h.reply(chatID, "Ошибка получения цены")
+		return
+	}
+
 
 	data.Products = append(data.Products, storage.Product{
 		URL:       url,
