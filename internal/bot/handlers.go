@@ -17,16 +17,21 @@ type Handler struct {
 	Store   *storage.Storage
 	AdminID int64
 
-	waitingForURL map[int64]bool
-	mu            sync.Mutex
+	waiting map[int64]bool
+	mu      sync.Mutex
 }
+
+const (
+	ForURL int64 = iota
+	ForRemove
+)
 
 func NewHandler(bot *tgbotapi.BotAPI, store *storage.Storage, adminID int64) *Handler {
 	return &Handler{
-		Bot:           bot,
-		Store:         store,
-		AdminID:       adminID,
-		waitingForURL: make(map[int64]bool),
+		Bot:     bot,
+		Store:   store,
+		AdminID: adminID,
+		waiting: make(map[int64]bool),
 	}
 }
 
@@ -43,53 +48,69 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 	// =========================
 	// Сначала команды
 	// =========================
-	if msg.IsCommand() {
+	// if msg.IsCommand() {
 
-		switch msg.Command() {
+	// 	switch msg.Command() {
 
-		case "start":
-			h.subscribe(msg.Chat.ID, userID)
+	// 	case "start":
+	// 		h.subscribe(msg.Chat.ID, userID)
 
-		case "products":
-			h.listProducts(msg.Chat.ID)
+	// 	case "products":
+	// 		h.listProducts(msg.Chat.ID)
 
-		case "unsubscribe":
-			h.unsubscribe(msg.Chat.ID, userID)
+	// 	case "unsubscribe":
+	// 		h.unsubscribe(msg.Chat.ID, userID)
 
-		case "add":
-			if userID == h.AdminID {
-				h.addProductFromCommand(msg.Chat.ID, text)
-			} else {
-				h.reply(msg.Chat.ID, "❌ Нет доступа")
-			}
+	// 	case "add":
+	// 		if userID == h.AdminID {
+	// 			h.addProductFromCommand(msg.Chat.ID, text)
+	// 		} else {
+	// 			h.reply(msg.Chat.ID, "❌ Нет доступа")
+	// 		}
 
-		case "remove":
-			if userID == h.AdminID {
-				h.removeProduct(msg.Chat.ID, text)
-			} else {
-				h.reply(msg.Chat.ID, "❌ Нет доступа")
-			}
+	// 	case "remove":
+	// 		if userID == h.AdminID {
+	// 			h.removeProduct(msg.Chat.ID, text)
+	// 		} else {
+	// 			h.reply(msg.Chat.ID, "❌ Нет доступа")
+	// 		}
 
-		default:
-			h.reply(msg.Chat.ID, "Неизвестная команда")
-		}
+	// 	default:
+	// 		h.reply(msg.Chat.ID, "Неизвестная команда")
+	// 	}
 
-		return
-	}
+	// 	return
+	// }
 
 	// =========================
 	// Если админ в режиме ожидания ссылки
 	// =========================
 	h.mu.Lock()
-	waiting := h.waitingForURL[userID]
+	waitingForURL := h.waiting[ForURL]
 	h.mu.Unlock()
 
-	if waiting {
+	if waitingForURL {
 		h.mu.Lock()
-		h.waitingForURL[userID] = false
+		h.waiting[ForURL] = false
 		h.mu.Unlock()
 
 		h.addProductByURL(msg.Chat.ID, userID, text)
+		return
+	}
+	// =========================
+	// Если админ в режиме ожидания номера товара, который нужно удалить
+	// =========================
+	h.mu.Lock()
+	waitingRemove := h.waiting[ForRemove]
+	h.mu.Unlock()
+
+	if waitingRemove {
+		h.mu.Lock()
+		// waitingRemove = false
+		h.waiting[ForRemove] = false
+		h.mu.Unlock()
+
+		h.removeProduct(msg.Chat.ID, text)
 		return
 	}
 
@@ -105,11 +126,16 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 		h.unsubscribe(msg.Chat.ID, userID)
 
 	case "❌ Удалить":
-		if userID == h.AdminID {
-			h.removeProduct(msg.Chat.ID, text)
-		} else {
+		if userID != h.AdminID {
 			h.reply(msg.Chat.ID, "❌ Нет доступа")
+			return
 		}
+
+		h.mu.Lock()
+		h.waiting[ForRemove] = true
+		h.mu.Unlock()
+
+		h.reply(msg.Chat.ID, "Отправь номер удаления товара")
 
 	case "➕ Добавить":
 		if userID != h.AdminID {
@@ -118,7 +144,7 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 		}
 
 		h.mu.Lock()
-		h.waitingForURL[userID] = true
+		h.waiting[ForURL] = true
 		h.mu.Unlock()
 
 		h.reply(msg.Chat.ID, "🔗 Отправь ссылку на товар")
@@ -128,9 +154,9 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 	}
 }
 
-func (h *Handler) reply(chatID int64, text string) {
-	msg := tgbotapi.NewMessage(chatID, text)
-	h.Bot.Send(msg)
+func (h *Handler) reply(chatID int64, text string) { // Ответ
+	msg := tgbotapi.NewMessage(chatID, text) // Создаёт новое сообщение
+	h.Bot.Send(msg)                          // Отправить сообщение в бота
 }
 
 func (h *Handler) subscribe(chatID int64, userID int64) {
@@ -183,7 +209,7 @@ func (h *Handler) unsubscribe(chatID int64, userID int64) {
 // =========================
 func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 
-	if ok := strings.HasPrefix(url,"https"); !ok {
+	if ok := strings.HasPrefix(url, "https"); !ok {
 		h.reply(chatID, "Это не ссылка на товар")
 		return
 	}
@@ -204,7 +230,6 @@ func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 		h.reply(chatID, "Ошибка получения цены")
 		return
 	}
-
 
 	data.Products = append(data.Products, storage.Product{
 		URL:       url,
@@ -256,13 +281,14 @@ func (h *Handler) listProducts(chatID int64) {
 }
 
 func (h *Handler) removeProduct(chatID int64, text string) {
-	parts := strings.Split(text, " ")
-	if len(parts) < 2 {
-		h.reply(chatID, "Использование: /remove номер")
-		return
-	}
 
-	index, err := strconv.Atoi(parts[1])
+	parts := strings.Split(text, " ")
+	// if len(parts) < 2 {
+	// 	h.reply(chatID, "Использование: /remove номер")
+	// 	return
+	// }
+
+	index, err := strconv.Atoi(parts[0])
 	if err != nil {
 		h.reply(chatID, "Нужно указать число")
 		return
