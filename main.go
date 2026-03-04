@@ -99,6 +99,12 @@ func main() {
 		if update.Message == nil {
 			continue
 		}
+		if update.Message.Text == "/start" {
+			msg1 := tgbotapi.NewMessage(update.Message.Chat.ID,"Menu")
+			msg1.ReplyMarkup = botpkg.MainKeyboard(cfg.AdminID == update.Message.From.ID)
+			
+			tgbot.Send(msg1)
+		}
 
 		go handler.Handle(update)
 	}

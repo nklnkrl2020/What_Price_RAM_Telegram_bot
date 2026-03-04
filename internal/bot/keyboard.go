@@ -9,6 +9,12 @@ func MainKeyboard(isAdmin bool) tgbotapi.ReplyKeyboardMarkup {
 	if isAdmin {
 		rows = [][]tgbotapi.KeyboardButton{
 			{
+				tgbotapi.NewKeyboardButton("Подписаться"),
+			},
+			{
+				tgbotapi.NewKeyboardButton("ЗАПУСК"),
+			},
+			{
 				tgbotapi.NewKeyboardButton("➕ Добавить"),
 			},
 			{
@@ -23,6 +29,9 @@ func MainKeyboard(isAdmin bool) tgbotapi.ReplyKeyboardMarkup {
 		}
 	} else {
 		rows = [][]tgbotapi.KeyboardButton{
+			{
+				tgbotapi.NewKeyboardButton("Подписаться"),
+			},
 			{
 				tgbotapi.NewKeyboardButton("📦 Товары"),
 			},

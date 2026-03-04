@@ -119,6 +119,9 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 	// =========================
 	switch text {
 
+	case "Подписаться":
+		h.subscribe(msg.Chat.ID,userID)
+
 	case "📦 Товары":
 		h.listProducts(msg.Chat.ID)
 
