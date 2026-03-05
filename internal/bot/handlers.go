@@ -10,6 +10,7 @@ import (
 
 	"price-bot/internal/parser"
 	"price-bot/internal/storage"
+	
 )
 
 type Handler struct {
@@ -119,16 +120,19 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 	// =========================
 	switch text {
 
-	case "Подписаться":
+	case RUN:
+		h.runCheckPrices()
+
+	case SUBSCRIBE:
 		h.subscribe(msg.Chat.ID,userID)
 
-	case "📦 Товары":
+	case PRODUCTS:
 		h.listProducts(msg.Chat.ID)
 
-	case "❌ Отписаться":
+	case UNSUBSCRIBE:
 		h.unsubscribe(msg.Chat.ID, userID)
 
-	case "❌ Удалить":
+	case DELETE:
 		if userID != h.AdminID {
 			h.reply(msg.Chat.ID, "❌ Нет доступа")
 			return
@@ -140,7 +144,7 @@ func (h *Handler) Handle(update tgbotapi.Update) {
 
 		h.reply(msg.Chat.ID, "Отправь номер удаления товара")
 
-	case "➕ Добавить":
+	case ADD:
 		if userID != h.AdminID {
 			h.reply(msg.Chat.ID, "❌ Нет доступа")
 			return
@@ -309,4 +313,8 @@ func (h *Handler) removeProduct(chatID int64, text string) {
 	h.Store.Save(data)
 
 	h.reply(chatID, fmt.Sprintf("❌ Удалён:\n%s", removed.URL))
+}
+
+func (h *Handler) runCheckPrices () {
+	CheckPrices(h.Bot,h.Store)
 }

@@ -2,6 +2,15 @@ package bot
 
 import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+const (
+	SUBSCRIBE = 	"✅ Подписаться"
+	RUN = 			"🚀 Запуск"
+	ADD = 			"➕ Добавить"
+	PRODUCTS = 		"📦 Товары"
+	DELETE = 		"❌ Удалить"
+	UNSUBSCRIBE = 	"❌ Отписаться"
+)
+
 func MainKeyboard(isAdmin bool) tgbotapi.ReplyKeyboardMarkup {
 
 	var rows [][]tgbotapi.KeyboardButton
@@ -9,34 +18,34 @@ func MainKeyboard(isAdmin bool) tgbotapi.ReplyKeyboardMarkup {
 	if isAdmin {
 		rows = [][]tgbotapi.KeyboardButton{
 			{
-				tgbotapi.NewKeyboardButton("Подписаться"),
+				tgbotapi.NewKeyboardButton(SUBSCRIBE),
 			},
 			{
-				tgbotapi.NewKeyboardButton("ЗАПУСК"),
+				tgbotapi.NewKeyboardButton(RUN),
 			},
 			{
-				tgbotapi.NewKeyboardButton("➕ Добавить"),
+				tgbotapi.NewKeyboardButton(ADD),
 			},
 			{
-				tgbotapi.NewKeyboardButton("📦 Товары"),
+				tgbotapi.NewKeyboardButton(PRODUCTS),
 			},
 			{
-				tgbotapi.NewKeyboardButton("❌ Удалить"),
+				tgbotapi.NewKeyboardButton(DELETE),
 			},
 			{
-				tgbotapi.NewKeyboardButton("❌ Отписаться"),
+				tgbotapi.NewKeyboardButton(UNSUBSCRIBE),
 			},
 		}
 	} else {
 		rows = [][]tgbotapi.KeyboardButton{
 			{
-				tgbotapi.NewKeyboardButton("Подписаться"),
+				tgbotapi.NewKeyboardButton(SUBSCRIBE),
 			},
 			{
-				tgbotapi.NewKeyboardButton("📦 Товары"),
+				tgbotapi.NewKeyboardButton(PRODUCTS),
 			},
 			{
-				tgbotapi.NewKeyboardButton("❌ Отписаться"),
+				tgbotapi.NewKeyboardButton(UNSUBSCRIBE),
 			},
 		}
 	}
