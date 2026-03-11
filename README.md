@@ -24,56 +24,42 @@ Telegram-бот для отслеживания цен на товары с са
 
 🤖 Telegram-бот с кнопочным меню
 
-🏗 Архитектура проекта
-price-bot
-│
-│ └── main.go
-│
-├── internal/
-│   ├── bot/        # обработка команд Telegram
-│   ├── parser/     # парсер цен
-│   ├── storage/    # работа с JSON
-│   └── config/     # конфигурация
-│
-├── data/
-│   └── products.json
-│
-├── go.mod
-└── README.md
-⚙️ Требования
-
-Go 1.22+
-
-Google Chrome
-
-Linux сервер (рекомендуется)
-
-Telegram Bot Token
 
 
 📄 Конфигурация
-Создать файл products.json в data
+
+Создать файл products.json в папке data
+
 Создать файл .env:
 
 BOT_TOKEN=your_token
+
 ADMIN_ID=your_telegram_id
+
 📦 Установка
 
 Установить зависимости:
 
 go mod download
 
+
 Запустить бота:
+
 
 go run main.go
 
+
 ⏱ Проверка цен
+
 
 По умолчанию бот проверяет цены:
 
+
 каждые 24 часа
 
+
 Это можно изменить в scheduler.
+
 
 
 
@@ -83,18 +69,6 @@ go run main.go
 
 data/products.json
 
-Пример:
-
-{
-  "products": [
-    {
-      "url": "...",
-      "last_price": 50000,
-      "min_price": 45000,
-      "max_price": 52000
-    }
-  ]
-}
 🔒 Безопасность
 
 только ADMIN_ID может:
