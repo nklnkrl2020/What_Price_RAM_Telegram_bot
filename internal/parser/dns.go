@@ -67,9 +67,9 @@ func GetPrice(url string) (int, error) {
 	var priceText string
 
 	err := chromedp.Run(ctx,
-		// Открываем главную страницу (как в Python)
-		chromedp.Navigate("https://www.dns-shop.ru/"),
-		chromedp.Sleep(4*time.Second),
+		// Открываем главную страницу 
+		// chromedp.Navigate("https://www.dns-shop.ru/"),
+		// chromedp.Sleep(4*time.Second),
 
 		// Переходим на страницу товара
 		chromedp.Navigate(url),
