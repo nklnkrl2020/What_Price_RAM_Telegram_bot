@@ -232,11 +232,15 @@ func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 		}
 	}
 
-	price, err := parser.GetPrice(url)
+	ctxBr, cancelCtx := parser.NewBrowser()
+
+	price, err := parser.GetPrice(ctxBr,url)
 	if err != nil {
 		h.reply(chatID, "Ошибка получения цены")
 		return
 	}
+
+	cancelCtx()
 
 	data.Products = append(data.Products, storage.Product{
 		URL:       url,
