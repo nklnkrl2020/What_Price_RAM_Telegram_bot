@@ -22,11 +22,14 @@ func CheckPrices(bot *tgbotapi.BotAPI, store *storage.Storage) {
 		return
 	}
 
+	ctx,cancelctx := parser.NewBrowser()
+	defer cancelctx()
+
 	for i, product := range data.Products {
 
 		log.Println("Проверяем:", product.URL)
 
-		newPrice, err := parser.GetPrice(product.URL)
+		newPrice, err := parser.GetPrice(ctx,product.URL)
 		if err != nil {
 			log.Println("Ошибка получения цены:", err)
 			continue

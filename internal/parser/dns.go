@@ -45,24 +45,24 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-func GetPrice(url string) (int, error) {
+func GetPrice(ctx context.Context, url string) (int, error) {
 
 	// Создаём контекст Chrome
-	ctx, cancel := chromedp.NewExecAllocator(context.Background(),
-		//chromedp.Headless,
-		chromedp.DisableGPU,
-		chromedp.NoSandbox,
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-	)
-	defer cancel()
+	// ctx, cancel := chromedp.NewExecAllocator(context.Background(),
+	// 	//chromedp.Headless,
+	// 	chromedp.DisableGPU,
+	// 	chromedp.NoSandbox,
+	// 	chromedp.Flag("disable-dev-shm-usage", true),
+	// 	chromedp.Flag("disable-blink-features", "AutomationControlled"),
+	// )
+	// defer cancel()
 
-	ctx, cancel = chromedp.NewContext(ctx)
-	defer cancel()
+	// ctx, cancel = chromedp.NewContext(ctx)
+	// defer cancel()
 
 	// Таймаут 30 секунд
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// defer cancel()
 
 	var priceText string
 
@@ -72,6 +72,7 @@ func GetPrice(url string) (int, error) {
 		// chromedp.Sleep(4*time.Second),
 
 		// Переходим на страницу товара
+		
 		chromedp.Navigate(url),
 		chromedp.Sleep(6*time.Second),
 
@@ -101,4 +102,27 @@ func GetPrice(url string) (int, error) {
 	}
 
 	return price, nil
+}
+
+func NewBrowser() (context.Context, context.CancelFunc) {
+
+		// Создаём контекст Chrome
+		ctx, cancel := chromedp.NewExecAllocator(
+		context.Background(),
+		//chromedp.Headless,
+		chromedp.DisableGPU,
+		chromedp.NoSandbox,
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+	)
+	
+
+	ctx, cancelCtx := chromedp.NewContext(ctx)
+
+	cancelAll := func() {
+		cancelCtx()
+		cancel()
+	}
+
+	return ctx, cancelAll
 }
