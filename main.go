@@ -117,7 +117,7 @@ func main() {
 // =========================
 func startScheduler(ctx context.Context, bot *tgbotapi.BotAPI, store *storage.Storage) {
 
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(8 * time.Hour)
 	defer ticker.Stop()
 
 	time.Sleep(10 * time.Second)

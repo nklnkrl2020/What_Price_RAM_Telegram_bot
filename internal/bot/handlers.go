@@ -233,6 +233,7 @@ func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 	}
 
 	ctxBr, cancelCtx := parser.NewBrowser()
+	defer cancelCtx()
 
 	price, err := parser.GetPrice(ctxBr,url)
 	if err != nil {
@@ -240,7 +241,6 @@ func (h *Handler) addProductByURL(chatID int64, userID int64, url string) {
 		return
 	}
 
-	cancelCtx()
 
 	data.Products = append(data.Products, storage.Product{
 		URL:       url,
